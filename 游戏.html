@@ -1,9 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>色彩跳跃：无尽道具版 (黄金节奏优化)</title>
+    <title>色彩跳跃：全平台适配版 (手机/PC通用)</title>
+    <!-- 【新增】锁定移动端视口，防止双击缩放和页面滑动 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        body { margin: 0; background-color: #000; overflow: hidden; font-family: 'Arial', sans-serif; user-select: none; }
+        /* 【新增】touch-action: none 防止手机浏览器默认的下拉刷新和滑动 */
+        body { margin: 0; background-color: #000; overflow: hidden; font-family: 'Arial', sans-serif; user-select: none; touch-action: none; -webkit-touch-callout: none; }
+        
         #menu-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, #1a1a1a, #000); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; }
         .level-btn { width: 70px; height: 70px; border-radius: 15px; border: 2px solid #444; margin: 10px; background: #222; color: #666; font-size: 24px; font-weight: bold; display: inline-flex; justify-content: center; align-items: center; transition: 0.3s; cursor: not-allowed; }
         .level-btn.unlocked { border-color: #ffd700; color: white; cursor: pointer; }
@@ -13,7 +17,7 @@
         #game-ui { display: none; }
         #stars-box { position: absolute; top: 20px; left: 20px; font-size: 35px; color: #333; z-index: 10; display: flex; gap: 5px; }
         .star-active { color: #ffd700; text-shadow: 0 0 10px #ffd700; }
-        #score-box { position: absolute; top: 20px; right: 20px; color: white; font-size: 24px; font-weight: bold; z-index: 10; text-align: right; }
+        #score-box { position: absolute; top: 20px; right: 20px; color: white; font-size: 24px; font-weight: bold; z-index: 10; text-align: right; cursor: pointer; padding: 10px; }
         #hp-ui { position: absolute; bottom: 20px; left: 20px; z-index: 10; }
         #hp-container { position: relative; width: 220px; height: 24px; background: #222; border: 2px solid white; border-radius: 12px; overflow: hidden; }
         #hp-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #ff4444, #ff6666); transition: 0.2s; }
@@ -25,7 +29,7 @@
         #quit-btn { position: absolute; top: 70px; left: 20px; background: rgba(255,50,50,0.8); color: white; border: none; padding: 8px 15px; border-radius: 5px; font-weight: bold; cursor: pointer; z-index: 10; }
         #quit-btn:hover { background: red; }
         #items-box { position: absolute; top: 120px; left: 20px; display: flex; flex-direction: column; gap: 15px; z-index: 10; }
-        .item-btn { background: rgba(255,255,255,0.1); border: 2px solid #888; border-radius: 10px; width: 60px; height: 60px; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; cursor: pointer; transition: 0.2s; position: relative; }
+        .item-btn { background: rgba(255,255,255,0.1); border: 2px solid #888; border-radius: 10px; width: 60px; height: 60px; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; cursor: pointer; transition: 0.2s; position: relative; pointer-events: auto; }
         .item-btn:hover { background: rgba(255,255,255,0.3); border-color: white; transform: scale(1.05); }
         .item-icon { font-size: 24px; }
         .item-count { position: absolute; bottom: 2px; right: 5px; font-size: 12px; font-weight: bold; color: #ffd700; }
@@ -36,6 +40,24 @@
         #overlay-text { font-size: 60px; font-weight: bold; margin-bottom: 30px; text-align: center; color: white; }
         .action-btn { padding: 15px 45px; font-size: 20px; border-radius: 30px; border: none; cursor: pointer; font-weight: bold; margin: 10px; transition: 0.2s; }
         .action-btn:hover { transform: scale(1.05); }
+
+        /* 【新增】手机端屏幕适配 */
+        @media (max-width: 600px) {
+            #stars-box { font-size: 25px; top: 10px; left: 10px; }
+            #score-box { font-size: 18px; top: 10px; right: 10px; padding: 5px; }
+            #target-info { font-size: 24px; top: 15px; }
+            #quit-btn { top: 50px; left: 10px; padding: 5px 10px; font-size: 12px; }
+            #items-box { top: 90px; left: 10px; gap: 10px; }
+            .item-btn { width: 50px; height: 50px; }
+            .item-icon { font-size: 20px; }
+            #hp-ui { bottom: 10px; left: 10px; }
+            #hp-container { width: 150px; height: 18px; }
+            #hp-num { font-size: 12px; }
+            #menu-overlay h1 { font-size: 30px !important; }
+            .level-btn { width: 60px; height: 60px; font-size: 20px; }
+            #overlay-text { font-size: 40px; }
+            .action-btn { padding: 10px 30px; font-size: 16px; }
+        }
     </style>
 </head>
 <body>
@@ -59,7 +81,8 @@
                 <span class="item-hotkey">3</span><span class="item-icon">⏱️</span><span class="item-count" id="count-slow">3</span>
             </div>
         </div>
-        <div id="score-box">SCORE: <span id="current-score">0</span></div>
+        <!-- 点击分数触发手机版上帝模式 -->
+        <div id="score-box" onclick="toggleGodMode()">SCORE: <span id="current-score">0</span></div>
         <div id="hp-ui"><div id="hp-container"><div id="hp-bar"></div><div id="hp-num">0 / 0</div></div></div>
         <div id="ui-center"><div id="target-info">...</div></div>
     </div>
@@ -86,7 +109,7 @@
         { id: 5, speed: 1.6, goal: 50, stars: 5 },
         { id: 6, speed: 1.8, goal: Infinity, stars: 0 } 
     ];
-    const SAVE_KEY = 'COLOR_JUMP_V23';
+    const SAVE_KEY = 'COLOR_JUMP_MOBILE';
     let unlockedLvl = parseInt(localStorage.getItem(SAVE_KEY)) || 1;
     let endlessSavedScore = parseInt(localStorage.getItem(SAVE_KEY + '_ENDLESS')) || 0;
     
@@ -94,11 +117,10 @@
     let isPlaying = false, isGod = false, startColorIdx = 0, totalRowsGenerated = 0;
     const PITCH = 5.5;
 
-    // 道具状态与速度控制系统
     let items = { hp: 3, shield: 3, slow: 3 };
     let effects = { shieldEnd: 0, slowEnd: 0 };
     let baseSpeed = 1.0;
-    let currentSpeed = 1.0; // 独立跟踪当前生效的速度
+    let currentSpeed = 1.0; 
     let pendingSpeed = null; 
 
     // --- 2. 初始化 ---
@@ -119,13 +141,11 @@
     const ball = new THREE.Mesh(ballGeo, new THREE.MeshStandardMaterial({ roughness: 0.1, emissiveIntensity: 0.6 }));
     scene.add(ball);
 
-    // 上帝模式光环
     const glowGeo = new THREE.SphereGeometry(0.55, 32, 32);
     glowGeo.translate(0, 0.45, 0); 
     const ballGlow = new THREE.Mesh(glowGeo, new THREE.MeshBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0, wireframe: true }));
     ball.add(ballGlow);
 
-    // 护盾道具光环
     const shieldGlow = new THREE.Mesh(glowGeo, new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0, wireframe: true }));
     ball.add(shieldGlow);
 
@@ -168,7 +188,6 @@
         document.getElementById('target-info').innerText = COLOR_NAMES[reqIdx];
         document.getElementById('target-info').style.color = '#' + COLORS[reqIdx].toString(16).padStart(6, '0');
 
-        // 更新道具数量UI
         ['hp', 'shield', 'slow'].forEach(k => {
             document.getElementById(`count-${k}`).innerText = items[k];
             document.getElementById(`item-${k}`).className = items[k] > 0 ? 'item-btn' : 'item-btn item-empty';
@@ -193,7 +212,6 @@
         totalRowsGenerated = score + 9; 
         startColorIdx = Math.floor(Math.random() * 3);
         
-        // 彻底重置速度与特效：无论之前是不是在减速，新关卡都会绝对恢复正常
         baseSpeed = curLvl.speed;
         currentSpeed = baseSpeed;
         applyPhysics(currentSpeed);
@@ -209,7 +227,6 @@
             }
         }
 
-        // 重新生成跑道
         rows.forEach(r => r.meshes.forEach(m => scene.remove(m)));
         rows = [];
         for (let i = score; i < score + 10; i++) createRow(i);
@@ -242,33 +259,31 @@
         rows.push({ rowIndex: rowIdx, meshes: rowMeshes });
     }
 
-    // --- 道具与核心控制系统 ---
     function useItem(type) {
         if (!isPlaying || items[type] <= 0) return;
-        
         if (type === 'hp') {
-            maxLives++; 
-            lives++; 
+            maxLives++; lives++; 
         } else if (type === 'shield') {
             effects.shieldEnd = Date.now() + 5000; 
         } else if (type === 'slow') {
-            // 【关键修改】：如果已经在减速时间，或者等待减速落地判定中，拒绝触发，不扣道具
-            if (Date.now() < effects.slowEnd || currentSpeed < baseSpeed || pendingSpeed !== null) {
-                return;
-            }
+            if (Date.now() < effects.slowEnd || currentSpeed < baseSpeed || pendingSpeed !== null) return;
             effects.slowEnd = Date.now() + 5000; 
             pendingSpeed = baseSpeed * 0.5; 
         }
-        
-        items[type]--;
-        updateUI();
+        items[type]--; updateUI();
+    }
+
+    // 手机点击分数也能触发无敌
+    function toggleGodMode() {
+        if (!isPlaying) return;
+        isGod = !isGod;
+        ballGlow.material.opacity = isGod ? 0.4 : 0;
     }
 
     function quitGame() {
         isPlaying = false;
         if (curLvl.id === 6) {
-            endlessSavedScore = score;
-            localStorage.setItem(SAVE_KEY + '_ENDLESS', score);
+            endlessSavedScore = score; localStorage.setItem(SAVE_KEY + '_ENDLESS', score);
         }
         backToMenu();
     }
@@ -284,8 +299,7 @@
     function triggerGameOver() {
         isPlaying = false; ball.visible = false;
         if (curLvl.id === 6) {
-            endlessSavedScore = 0;
-            localStorage.removeItem(SAVE_KEY + '_ENDLESS');
+            endlessSavedScore = 0; localStorage.removeItem(SAVE_KEY + '_ENDLESS');
         }
         showOverlay(curLvl.id === 6 ? `FINAL SCORE: ${score}` : "CRASHED!", "#ff4444", "RETRY");
     }
@@ -308,11 +322,12 @@
         renderMenu();
     }
 
+    // PC 键盘控制
     window.addEventListener('keydown', (e) => {
         if (!isPlaying) return;
         if ((e.key === 'a' || e.key === 'ArrowLeft') && currentLane > 0) currentLane--;
         if ((e.key === 'd' || e.key === 'ArrowRight') && currentLane < 2) currentLane++;
-        if (e.key.toLowerCase() === 's') { isGod = !isGod; ballGlow.material.opacity = isGod ? 0.4 : 0; }
+        if (e.key.toLowerCase() === 's') toggleGodMode();
         
         if (e.key === '1') useItem('hp');
         if (e.key === '2') useItem('shield');
@@ -321,6 +336,26 @@
         targetX = [-2.8, 0, 2.8][currentLane];
     });
 
+    // 【新增核心】移动端触摸控制
+    window.addEventListener('touchstart', (e) => {
+        if (!isPlaying) return;
+        
+        // 如果点击的是道具或者按钮，不进行变道
+        if (e.target.closest('.item-btn') || e.target.closest('button') || e.target.closest('#score-box')) return;
+
+        const touchX = e.touches[0].clientX;
+        const halfWidth = window.innerWidth / 2;
+
+        // 点击屏幕左半边向左走，右半边向右走
+        if (touchX < halfWidth && currentLane > 0) {
+            currentLane--; 
+        } else if (touchX >= halfWidth && currentLane < 2) {
+            currentLane++; 
+        }
+        
+        targetX = [-2.8, 0, 2.8][currentLane];
+    }, { passive: false });
+
     // --- 4. 循环核心 ---
     function animate() {
         requestAnimationFrame(animate);
@@ -328,7 +363,6 @@
 
         const now = Date.now();
 
-        // 道具状态视觉更新
         const hasShield = now < effects.shieldEnd;
         shieldGlow.material.opacity = hasShield ? 0.6 : 0;
         if (hasShield) {
@@ -336,12 +370,10 @@
             shieldGlow.scale.setScalar(1.1 + Math.sin(now * 0.01) * 0.05);
         }
 
-        // 减速时间结束检测
         if (now > effects.slowEnd && currentSpeed < baseSpeed && pendingSpeed === null) {
             pendingSpeed = baseSpeed; 
         }
 
-        // 无敌模式自动变道
         if (isGod) {
             const reqCol = (startColorIdx + Math.floor(score / 3)) % 3;
             const curRow = rows.find(r => r.rowIndex === score);
@@ -358,23 +390,19 @@
         shadow.position.x = ball.position.x;
         shadow.position.z = 0; 
 
-        // 阴影与当前方块对齐
         const activeRow = rows.find(r => r.rowIndex === score);
         const activePlatform = activeRow ? activeRow.meshes[currentLane] : null;
         if (activePlatform && Math.abs(activePlatform.position.z) < 1.6) {
             shadow.visible = true; shadow.position.y = activePlatform.position.y + 0.21;
         } else { shadow.visible = false; }
 
-        // 垂直物理
         vY += gravity; y += vY;
         
-        // 落地帧判定
         if (y <= 0.001 && vY < 0) {
             y = 0; 
 
-            // 如果有未决定的速度更改，在落地瞬间无缝重算物理
             if (pendingSpeed !== null) {
-                currentSpeed = pendingSpeed; // 【关键修改】：不再污染基础关卡速度
+                currentSpeed = pendingSpeed; 
                 applyPhysics(pendingSpeed);
                 pendingSpeed = null;
             }
@@ -400,7 +428,6 @@
         ball.position.y = y;
         ballLight.position.copy(ball.position).y += 1.5;
 
-        // 平台移动
         rows.forEach(row => {
             row.meshes.forEach(m => {
                 m.position.z += scrollSpeed;
@@ -445,7 +472,13 @@
         }
     }
     renderMenu(); animate();
-    window.addEventListener('resize', () => { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+    
+    // 监听屏幕大小变化，自动适配横竖屏
+    window.addEventListener('resize', () => { 
+        camera.aspect = window.innerWidth/window.innerHeight; 
+        camera.updateProjectionMatrix(); 
+        renderer.setSize(window.innerWidth, window.innerHeight); 
+    });
 </script>
 </body>
 </html>
