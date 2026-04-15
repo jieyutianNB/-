@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>色彩跳跃：无尽道具版 (黄金节奏优化)</title>
+    <style>
+        body { margin: 0; background-color: #000; overflow: hidden; font-family: 'Arial', sans-serif; user-select: none; }
+        #menu-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, #1a1a1a, #000); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; }
+        .level-btn { width: 70px; height: 70px; border-radius: 15px; border: 2px solid #444; margin: 10px; background: #222; color: #666; font-size: 24px; font-weight: bold; display: inline-flex; justify-content: center; align-items: center; transition: 0.3s; cursor: not-allowed; }
+        .level-btn.unlocked { border-color: #ffd700; color: white; cursor: pointer; }
+        .level-btn.unlocked:hover { background: #ffd700; color: #000; box-shadow: 0 0 20px #ffd700; transform: scale(1.1); }
+        .level-btn.endless { border-color: #00ffcc; color: #00ffcc; font-size: 32px; }
+        
+        #game-ui { display: none; }
+        #stars-box { position: absolute; top: 20px; left: 20px; font-size: 35px; color: #333; z-index: 10; display: flex; gap: 5px; }
+        .star-active { color: #ffd700; text-shadow: 0 0 10px #ffd700; }
+        #score-box { position: absolute; top: 20px; right: 20px; color: white; font-size: 24px; font-weight: bold; z-index: 10; text-align: right; }
+        #hp-ui { position: absolute; bottom: 20px; left: 20px; z-index: 10; }
+        #hp-container { position: relative; width: 220px; height: 24px; background: #222; border: 2px solid white; border-radius: 12px; overflow: hidden; }
+        #hp-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #ff4444, #ff6666); transition: 0.2s; }
+        #hp-num { position: absolute; width: 100%; height: 100%; top: 0; left: 0; display: flex; justify-content: center; align-items: center; color: white; font-size: 14px; font-weight: bold; }
+        #ui-center { position: absolute; top: 20px; width: 100%; text-align: center; color: white; pointer-events: none; z-index: 10; }
+        #target-info { font-size: 35px; font-weight: bold; text-shadow: 0px 0px 10px rgba(255,255,255,0.5); }
+        
+        /* 道具与退出 UI */
+        #quit-btn { position: absolute; top: 70px; left: 20px; background: rgba(255,50,50,0.8); color: white; border: none; padding: 8px 15px; border-radius: 5px; font-weight: bold; cursor: pointer; z-index: 10; }
+        #quit-btn:hover { background: red; }
+        #items-box { position: absolute; top: 120px; left: 20px; display: flex; flex-direction: column; gap: 15px; z-index: 10; }
+        .item-btn { background: rgba(255,255,255,0.1); border: 2px solid #888; border-radius: 10px; width: 60px; height: 60px; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; cursor: pointer; transition: 0.2s; position: relative; }
+        .item-btn:hover { background: rgba(255,255,255,0.3); border-color: white; transform: scale(1.05); }
+        .item-icon { font-size: 24px; }
+        .item-count { position: absolute; bottom: 2px; right: 5px; font-size: 12px; font-weight: bold; color: #ffd700; }
+        .item-hotkey { position: absolute; top: 2px; left: 5px; font-size: 10px; color: #aaa; }
+        .item-empty { opacity: 0.3; cursor: not-allowed; }
+
+        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 150; }
+        #overlay-text { font-size: 60px; font-weight: bold; margin-bottom: 30px; text-align: center; color: white; }
+        .action-btn { padding: 15px 45px; font-size: 20px; border-radius: 30px; border: none; cursor: pointer; font-weight: bold; margin: 10px; transition: 0.2s; }
+        .action-btn:hover { transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <div id="menu-overlay">
+        <h1 style="color: white; margin-bottom: 30px; font-size: 40px; text-shadow: 0 0 20px rgba(255,255,255,0.5);">COLOR JUMP</h1>
+        <div class="level-grid" id="level-grid"></div>
+        <button style="margin-top:40px; padding: 10px 20px; background:none; border:1px solid #444; color:#666; border-radius: 5px; cursor:pointer;" onclick="localStorage.clear(); location.reload();">重置所有进度与存档</button>
+    </div>
+
+    <div id="game-ui">
+        <div id="stars-box"></div>
+        <button id="quit-btn" onclick="quitGame()">QUIT</button>
+        <div id="items-box">
+            <div class="item-btn" id="item-hp" onclick="useItem('hp')">
+                <span class="item-hotkey">1</span><span class="item-icon">❤️</span><span class="item-count" id="count-hp">3</span>
+            </div>
+            <div class="item-btn" id="item-shield" onclick="useItem('shield')">
+                <span class="item-hotkey">2</span><span class="item-icon">🛡️</span><span class="item-count" id="count-shield">3</span>
+            </div>
+            <div class="item-btn" id="item-slow" onclick="useItem('slow')">
+                <span class="item-hotkey">3</span><span class="item-icon">⏱️</span><span class="item-count" id="count-slow">3</span>
+            </div>
+        </div>
+        <div id="score-box">SCORE: <span id="current-score">0</span></div>
+        <div id="hp-ui"><div id="hp-container"><div id="hp-bar"></div><div id="hp-num">0 / 0</div></div></div>
+        <div id="ui-center"><div id="target-info">...</div></div>
+    </div>
+
+    <div id="overlay">
+        <div id="overlay-text">TITLE</div>
+        <div style="display:flex;">
+            <button class="action-btn" style="background: #444; color: white;" onclick="backToMenu()">MENU</button>
+            <button class="action-btn" id="main-action-btn" style="background: #ffd700; color: #000;"></button>
+        </div>
+    </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+    // --- 1. 数据配置 ---
+    const COLORS = [0xff2244, 0xffd700, 0x00aaff];
+    const COLOR_NAMES = ["RED", "YELLOW", "BLUE"];
+    
+    const LVL_DATA = [
+        { id: 1, speed: 1.0, goal: 10, stars: 1 },
+        { id: 2, speed: 1.15, goal: 20, stars: 2 },
+        { id: 3, speed: 1.3, goal: 30, stars: 3 },
+        { id: 4, speed: 1.45, goal: 40, stars: 4 },
+        { id: 5, speed: 1.6, goal: 50, stars: 5 },
+        { id: 6, speed: 1.8, goal: Infinity, stars: 0 } 
+    ];
+    const SAVE_KEY = 'COLOR_JUMP_V23';
+    let unlockedLvl = parseInt(localStorage.getItem(SAVE_KEY)) || 1;
+    let endlessSavedScore = parseInt(localStorage.getItem(SAVE_KEY + '_ENDLESS')) || 0;
+    
+    let curLvl = null, score = 0, lives = 0, maxLives = 0;
+    let isPlaying = false, isGod = false, startColorIdx = 0, totalRowsGenerated = 0;
+    const PITCH = 5.5;
+
+    // 道具状态与速度控制系统
+    let items = { hp: 3, shield: 3, slow: 3 };
+    let effects = { shieldEnd: 0, slowEnd: 0 };
+    let baseSpeed = 1.0;
+    let currentSpeed = 1.0; // 独立跟踪当前生效的速度
+    let pendingSpeed = null; 
+
+    // --- 2. 初始化 ---
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x000000, 10, 45);
+    const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 4.5, 9);
+    camera.lookAt(0, 0, -2);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+    const ballLight = new THREE.PointLight(0xffffff, 10, 20);
+    scene.add(ballLight);
+
+    const ballGeo = new THREE.SphereGeometry(0.45, 32, 32);
+    ballGeo.translate(0, 0.45, 0); 
+    const ball = new THREE.Mesh(ballGeo, new THREE.MeshStandardMaterial({ roughness: 0.1, emissiveIntensity: 0.6 }));
+    scene.add(ball);
+
+    // 上帝模式光环
+    const glowGeo = new THREE.SphereGeometry(0.55, 32, 32);
+    glowGeo.translate(0, 0.45, 0); 
+    const ballGlow = new THREE.Mesh(glowGeo, new THREE.MeshBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0, wireframe: true }));
+    ball.add(ballGlow);
+
+    // 护盾道具光环
+    const shieldGlow = new THREE.Mesh(glowGeo, new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0, wireframe: true }));
+    ball.add(shieldGlow);
+
+    const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.45, 32), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5 }));
+    shadow.rotation.x = -Math.PI/2; scene.add(shadow);
+
+    let gravity, jumpV, scrollSpeed, y = 0, vY = 0, currentLane = 1, targetX = 0, rows = [];
+
+    // --- 3. 逻辑控制 ---
+    function applyPhysics(speedVal) {
+        const targetJumpV = 0.11 * speedVal;
+        const targetGravity = -0.0025 * speedVal * speedVal;
+        
+        const exactFrames = Math.round(-2 * targetJumpV / targetGravity);
+        jumpV = targetJumpV;
+        gravity = -2 * jumpV / (exactFrames + 1); 
+        scrollSpeed = PITCH / exactFrames; 
+    }
+
+    function updateUI() {
+        document.getElementById('current-score').innerText = score;
+        const sBox = document.getElementById('stars-box');
+        if (curLvl.id === 6) { 
+            sBox.style.display = 'none'; 
+        } else {
+            sBox.style.display = 'flex';
+            const step = curLvl.goal / curLvl.stars;
+            for(let i=0; i<curLvl.stars; i++){
+                const s = document.getElementById('star-'+i);
+                if(s) s.className = score >= (i+1)*step ? 'star-active' : '';
+            }
+        }
+        document.getElementById('hp-bar').style.width = (lives/maxLives)*100 + "%";
+        document.getElementById('hp-num').innerText = `${lives} / ${maxLives}`;
+
+        const reqIdx = (startColorIdx + Math.floor(score / 3)) % 3;
+        ball.material.color.setHex(COLORS[reqIdx]);
+        ball.material.emissive.setHex(COLORS[reqIdx]);
+        ballLight.color.setHex(COLORS[reqIdx]);
+        document.getElementById('target-info').innerText = COLOR_NAMES[reqIdx];
+        document.getElementById('target-info').style.color = '#' + COLORS[reqIdx].toString(16).padStart(6, '0');
+
+        // 更新道具数量UI
+        ['hp', 'shield', 'slow'].forEach(k => {
+            document.getElementById(`count-${k}`).innerText = items[k];
+            document.getElementById(`item-${k}`).className = items[k] > 0 ? 'item-btn' : 'item-btn item-empty';
+        });
+
+        if (curLvl.goal !== Infinity && score >= curLvl.goal) triggerWin();
+    }
+
+    function initLevel(id) {
+        curLvl = LVL_DATA.find(l => l.id === id);
+        
+        if (id === 6) {
+            score = endlessSavedScore;
+            maxLives = 5; lives = maxLives; 
+            document.getElementById('quit-btn').innerText = "SAVE & QUIT";
+        } else {
+            score = 0;
+            maxLives = id; lives = maxLives;
+            document.getElementById('quit-btn').innerText = "QUIT";
+        }
+
+        totalRowsGenerated = score + 9; 
+        startColorIdx = Math.floor(Math.random() * 3);
+        
+        // 彻底重置速度与特效：无论之前是不是在减速，新关卡都会绝对恢复正常
+        baseSpeed = curLvl.speed;
+        currentSpeed = baseSpeed;
+        applyPhysics(currentSpeed);
+        items = { hp: 3, shield: 3, slow: 3 };
+        effects = { shieldEnd: 0, slowEnd: 0 };
+        pendingSpeed = null;
+
+        const sBox = document.getElementById('stars-box');
+        sBox.innerHTML = '';
+        if(curLvl.id !== 6){
+            for(let i=0; i<curLvl.stars; i++){
+                const s = document.createElement('span'); s.id='star-'+i; s.innerText='★'; sBox.appendChild(s);
+            }
+        }
+
+        // 重新生成跑道
+        rows.forEach(r => r.meshes.forEach(m => scene.remove(m)));
+        rows = [];
+        for (let i = score; i < score + 10; i++) createRow(i);
+
+        document.getElementById('menu-overlay').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('game-ui').style.display = 'block';
+        updateUI();
+        
+        ball.visible = true; ball.position.set(0, 0, 0);
+        y = 0; vY = 0; currentLane = 1; targetX = 0;
+        isPlaying = true;
+    }
+
+    function createRow(rowIdx) {
+        const rowMeshes = [];
+        const reqCol = (startColorIdx + Math.floor(rowIdx / 3)) % 3;
+        const safeLane = Math.floor(Math.random() * 3);
+        const lxX = [-2.8, 0, 2.8];
+        lxX.forEach((lx, lIdx) => {
+            const m = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.4, 2.6), new THREE.MeshStandardMaterial({ roughness: 0.1, emissiveIntensity: 0.4 }));
+            m.position.set(lx, -0.2, -(rowIdx - score) * PITCH); 
+            
+            const isCorrect = (rowIdx === score && lIdx === 1) || (rowIdx > score && lIdx === safeLane);
+            const cIdx = isCorrect ? reqCol : (Math.floor(Math.random()*3));
+            m.material.color.setHex(COLORS[cIdx]); m.material.emissive.setHex(COLORS[cIdx]);
+            m.userData = { laneIndex: lIdx, colorIndex: cIdx };
+            scene.add(m); rowMeshes.push(m);
+        });
+        rows.push({ rowIndex: rowIdx, meshes: rowMeshes });
+    }
+
+    // --- 道具与核心控制系统 ---
+    function useItem(type) {
+        if (!isPlaying || items[type] <= 0) return;
+        
+        if (type === 'hp') {
+            maxLives++; 
+            lives++; 
+        } else if (type === 'shield') {
+            effects.shieldEnd = Date.now() + 5000; 
+        } else if (type === 'slow') {
+            // 【关键修改】：如果已经在减速时间，或者等待减速落地判定中，拒绝触发，不扣道具
+            if (Date.now() < effects.slowEnd || currentSpeed < baseSpeed || pendingSpeed !== null) {
+                return;
+            }
+            effects.slowEnd = Date.now() + 5000; 
+            pendingSpeed = baseSpeed * 0.5; 
+        }
+        
+        items[type]--;
+        updateUI();
+    }
+
+    function quitGame() {
+        isPlaying = false;
+        if (curLvl.id === 6) {
+            endlessSavedScore = score;
+            localStorage.setItem(SAVE_KEY + '_ENDLESS', score);
+        }
+        backToMenu();
+    }
+
+    function triggerWin() {
+        isPlaying = false;
+        if (curLvl.id === unlockedLvl && unlockedLvl < 6) {
+            unlockedLvl++; localStorage.setItem(SAVE_KEY, unlockedLvl);
+        }
+        showOverlay("MISSION CLEAR!", "#ffd700", curLvl.id < 6 ? "NEXT LEVEL" : "REPLAY");
+    }
+
+    function triggerGameOver() {
+        isPlaying = false; ball.visible = false;
+        if (curLvl.id === 6) {
+            endlessSavedScore = 0;
+            localStorage.removeItem(SAVE_KEY + '_ENDLESS');
+        }
+        showOverlay(curLvl.id === 6 ? `FINAL SCORE: ${score}` : "CRASHED!", "#ff4444", "RETRY");
+    }
+
+    function showOverlay(txt, col, btnTxt) {
+        document.getElementById('game-ui').style.display = 'none';
+        document.getElementById('overlay').style.display = 'flex';
+        document.getElementById('overlay-text').innerText = txt;
+        document.getElementById('overlay-text').style.color = col;
+        const btn = document.getElementById('main-action-btn');
+        btn.innerText = btnTxt;
+        btn.onclick = () => btnTxt === "NEXT LEVEL" ? initLevel(curLvl.id + 1) : initLevel(curLvl.id);
+    }
+
+    function backToMenu() {
+        isPlaying = false; 
+        document.getElementById('game-ui').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('menu-overlay').style.display = 'flex';
+        renderMenu();
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (!isPlaying) return;
+        if ((e.key === 'a' || e.key === 'ArrowLeft') && currentLane > 0) currentLane--;
+        if ((e.key === 'd' || e.key === 'ArrowRight') && currentLane < 2) currentLane++;
+        if (e.key.toLowerCase() === 's') { isGod = !isGod; ballGlow.material.opacity = isGod ? 0.4 : 0; }
+        
+        if (e.key === '1') useItem('hp');
+        if (e.key === '2') useItem('shield');
+        if (e.key === '3') useItem('slow');
+        
+        targetX = [-2.8, 0, 2.8][currentLane];
+    });
+
+    // --- 4. 循环核心 ---
+    function animate() {
+        requestAnimationFrame(animate);
+        if (!isPlaying) return;
+
+        const now = Date.now();
+
+        // 道具状态视觉更新
+        const hasShield = now < effects.shieldEnd;
+        shieldGlow.material.opacity = hasShield ? 0.6 : 0;
+        if (hasShield) {
+            shieldGlow.rotation.y -= 0.1;
+            shieldGlow.scale.setScalar(1.1 + Math.sin(now * 0.01) * 0.05);
+        }
+
+        // 减速时间结束检测
+        if (now > effects.slowEnd && currentSpeed < baseSpeed && pendingSpeed === null) {
+            pendingSpeed = baseSpeed; 
+        }
+
+        // 无敌模式自动变道
+        if (isGod) {
+            const reqCol = (startColorIdx + Math.floor(score / 3)) % 3;
+            const curRow = rows.find(r => r.rowIndex === score);
+            if (curRow) {
+                const target = curRow.meshes.find(m => m.userData.colorIndex === reqCol);
+                if (target) { currentLane = target.userData.laneIndex; targetX = [-2.8, 0, 2.8][currentLane]; }
+            }
+            ballGlow.rotation.y += 0.05;
+            ballGlow.scale.setScalar(1 + Math.sin(now * 0.01) * 0.1);
+        }
+
+        const lerpFactor = 0.2 + (currentSpeed * 0.1);
+        ball.position.x += (targetX - ball.position.x) * lerpFactor;
+        shadow.position.x = ball.position.x;
+        shadow.position.z = 0; 
+
+        // 阴影与当前方块对齐
+        const activeRow = rows.find(r => r.rowIndex === score);
+        const activePlatform = activeRow ? activeRow.meshes[currentLane] : null;
+        if (activePlatform && Math.abs(activePlatform.position.z) < 1.6) {
+            shadow.visible = true; shadow.position.y = activePlatform.position.y + 0.21;
+        } else { shadow.visible = false; }
+
+        // 垂直物理
+        vY += gravity; y += vY;
+        
+        // 落地帧判定
+        if (y <= 0.001 && vY < 0) {
+            y = 0; 
+
+            // 如果有未决定的速度更改，在落地瞬间无缝重算物理
+            if (pendingSpeed !== null) {
+                currentSpeed = pendingSpeed; // 【关键修改】：不再污染基础关卡速度
+                applyPhysics(pendingSpeed);
+                pendingSpeed = null;
+            }
+            
+            rows.forEach(row => {
+                row.meshes.forEach(m => {
+                    m.position.z = (score - row.rowIndex) * PITCH;
+                });
+            });
+
+            const reqIdx = (startColorIdx + Math.floor(score / 3)) % 3;
+            const isCorrectColor = activePlatform && activePlatform.userData.colorIndex === reqIdx;
+            
+            if (isGod || hasShield || isCorrectColor) {
+                vY = jumpV; score++; updateUI();
+            } else {
+                lives--; score++; updateUI();
+                if (lives <= 0) { triggerGameOver(); return; }
+                else { vY = jumpV; y = 0.05; }
+            }
+        }
+        
+        ball.position.y = y;
+        ballLight.position.copy(ball.position).y += 1.5;
+
+        // 平台移动
+        rows.forEach(row => {
+            row.meshes.forEach(m => {
+                m.position.z += scrollSpeed;
+                if (row.rowIndex === score && m.userData.laneIndex === currentLane) {
+                    m.position.y = -0.2 - (y > 0.05 ? 0 : 0.06); 
+                } else {
+                    m.position.y += (-0.2 - m.position.y) * 0.15;
+                }
+            });
+            
+            if (row.meshes[0].position.z > 8.5) {
+                totalRowsGenerated++;
+                const newRowIdx = totalRowsGenerated;
+                const req = (startColorIdx + Math.floor(newRowIdx / 3)) % 3;
+                const safeLane = Math.floor(Math.random() * 3);
+                row.rowIndex = newRowIdx;
+                row.meshes.forEach((m, lIdx) => {
+                    m.position.z -= 10 * PITCH; 
+                    const cIdx = lIdx === safeLane ? req : Math.floor(Math.random()*3);
+                    m.material.color.setHex(COLORS[cIdx]); m.material.emissive.setHex(COLORS[cIdx]);
+                    m.userData.colorIndex = cIdx;
+                });
+            }
+        });
+        renderer.render(scene, camera);
+    }
+
+    function renderMenu() {
+        const grid = document.getElementById('level-grid'); grid.innerHTML = '';
+        for (let i = 1; i <= 6; i++) {
+            const btn = document.createElement('div');
+            btn.className = `level-btn ${i <= unlockedLvl ? 'unlocked' : ''} ${i === 6 ? 'endless' : ''}`;
+            
+            if (i === 6) {
+                btn.innerHTML = endlessSavedScore > 0 ? `★<br><span style="font-size:12px">${endlessSavedScore}</span>` : '∞';
+            } else {
+                btn.innerText = i;
+            }
+            
+            if (i <= unlockedLvl) btn.onclick = () => initLevel(i);
+            grid.appendChild(btn);
+        }
+    }
+    renderMenu(); animate();
+    window.addEventListener('resize', () => { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+</script>
+</body>
+</html>
